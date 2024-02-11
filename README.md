@@ -36,7 +36,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.box = "ubuntu/focal64"
 
-  config.vm.network "public_network"
+  config.vm.network "forwarded_port", guest: 8000, host: 8000
 
   config.vm.provision "file", source: "./app", destination: "~/app"
   
@@ -45,13 +45,17 @@ Vagrant.configure("2") do |config|
     sudo apt-get install -y python3 python3-pip
     sudo pip3 install flask gunicorn
   SHELL
+  
+  config.vm.provision "shell", run: "always", inline: <<-SHELL
+    cd app && gunicorn --bind 0.0.0.0:8000 app:app &
+  SHELL
 end
 
 ```
-DHCP den ip alabilmesi için sanal makinenin network ayarı public olarak yapıldı.
+Sanal makinede çalıştırılan portun host makinede erişilebilmesi için ilgili port `guest` parametresine tanımlanır. Host makinede erişilmesi istenilen port ise `host` parametresine tanımlanır. Bu şekilde tanımlanan port, host makinede `localhost` üzerinden erişim sağlanır.
 
 ```ruby
-config.vm.network "public_network"
+config.vm.network "forwarded_port", guest: 8000, host: 8000
 ```
 Aşağıdaki satır ile sanal makineye dosyaların kopyalanmasını sağlar. Kaynak (source) ve hedef (destination) dizinler belirtilir. 
 
@@ -74,6 +78,14 @@ Aşağıdaki satır ile sanal makineye dosyaların kopyalanmasını sağlar. Kay
 
 Gunicorn, Python uygulamalarının web sunucusu olarak çalıştırılmasını sağlar ve bu durumda bir Flask uygulamasını çalıştırmak için kullanılmaktadır.
 
+Sanal makine her ayağa kalktığında (`vagrant up`) uygulamanın çalışması için `run always` yazılır. Uygulamayı çalıştırmak için gunicorn komutu kullanılır. Sunucunun tüm ağ arayüzlerinden gelen istekleri kabul etmesi için `--bind 0.0.0.0:8000` parametresi eklenir. 
+
+```ruby
+  config.vm.provision "shell", run: "always", inline: <<-SHELL
+    cd app && gunicorn --bind 0.0.0.0:8000 app:app &
+  SHELL
+```
+
 1. Sanal makineyi başlatmak için bu komut çalıştırılır
 
     ```bash
@@ -82,31 +94,15 @@ Gunicorn, Python uygulamalarının web sunucusu olarak çalıştırılmasını s
     
     ![](./doc/vm.png)
 
-2. Sanal makineye SSH ile bağlanmak için:
-
-    ```bash
-    vagrant ssh
-    ```
-
-3. Uygulama dizinine gidilerek, uygulama Gunicorn ile çalıştırılır.
-
-   ```bash
-   gunicorn --bind 0.0.0.0:8000 app:app
-   ```
-	--bind 0.0.0.0:8000 Bu, Gunicorn sunucusunun hangi IP adresi ve port üzerinde dinleyeceğini belirtir. app:app Bu, Gunicorn sunucusunun çalıştırılacak uygulamayı belirtir. 
-    
-
-4. Sanal makine ip'sini öğrenmek için `ifconfig` komutu kullanılır. İlgili ip ve port numarası web browser üzerinden girilerek test edilir.
-
     ![Hello World](./doc/app.png)
 
-5. Sanal makineyi kapatmak için:
+2. Sanal makineyi kapatmak için:
 
     ```bash
     vagrant halt
     ```
 
-6. Sanal makinayı tamamen silmek için:
+3. Sanal makinayı tamamen silmek için:
 
     ```bash
     vagrant destroy
